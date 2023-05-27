@@ -1,0 +1,264 @@
+---
+title: "Predicting the Mortality of an Opioid Overdose in Mesa, Arizona"
+author: "Leo Phouksouvath"
+date: "April 28, 2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = F, message = F, warning = F}
+library(tidyverse)
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(table1)
+library(gridExtra)
+```
+
+```{r, echo = F}
+rawData <- read.csv('EMSIncidents.csv')
+df <- read.csv('newData.csv')
+```
+
+# Abstract
+
+An observational study on opioid overdoses in Mesa, Arizona, using data taken from the Medical Opioid Overdose Incidents record (N=6832; all incidents recorded from May 2018 to March 2023). More than half of fatalities are observed to be from elderly individuals (52.2\%). Males made up a larger proportion of the fatalities, but the differences in the proportions of deaths was determined to be statistically insignificant. We estimate a logistic regression model to predict the log odds of an adult dying from an opioid overdose in Mesa, AZ. Age and the use of naloxone to be the most statistically significant predictors of a fatal overdose. 
+
+# Introduction
+
+The opioid epidemic, which began in the 1990's as a result of the overprescription of opioid painkillers, has recently experienced a sharp rise in the number of deaths including after the start of the Covid-19 pandemic[5]. In 2020 alone, it has been estimated that 68,630 overdose deaths have been attributed to opioid deaths[1]. From this the question arises, what are the factors that affect the likelihood of someone dying from an opioid overdose? 
+
+\noindent One of the solutions suggested to curb the rise in deaths from opioids is the use of harm reduction strategies. These include practices like using with other people, carrying narcan, and testing their substances[3]. Knowing their statistical significance can help us better understand how we treat opioids and shape future policies. Among existing policies there are samaritan laws which protect bystanders from prosecution if they calling emergency services and help keep the individual alive[4]. There are also now more states and counties training their officers to handle opioid overdoses[2]. Knowledge on the efficacy of narcan could perhaps illuminate the importance of such training. Regardless, there appears to be many factors that affect one's survival in an overdose incident. In this study, we want to answer the question that given an opioid overdose patient, does their age and gender, whether or not they were administered naloxone, and the time of day they overdosed serve as statistically significant predictors of their survival?
+
+# Methods
+
+The original dataset was taken from the City of Mesa, Arizona's Fire and Medical Opioid Overdose Incidents list. It records 8,089 incidents deemed as opioid overdoses by the Fire and Medical department, taken from May 7, 2018 to April 8, 2023. Each row represents a single incident that takes note of the date, basic characteristics of the patient such as their age and gender, any treatment of they received, and several other variables. 
+
+\noindent This study focuses on the patient's final status and any possible association with other variables: the age and gender of the patient, the time of day and day of the week of the incident, and whether they were treated with nalaxone. All observations that lacked any one of these variables were removed. Age which was originally reported in 5-year large age groups was grouped together into 4 separate categories: Teens (0-19 years), Young Adults (20-34), Middle-aged Adults (35-64), and Elderly Adults (65+). For each variable, we calculate the proportion of fatalities. We then use a Chi-squared distribution test to determine if there is any association between the respective variable and the patient's status. 
+
+\noindent To predict whether a variable was a significant predictor of death, a logistic regression model was used. We used sex, age group, and time of the day as categorical predictors; whether or not one received naloxone and if they overdosed during the weekend were both used as a binary predictors. We separated the days of the week into weekdays and weekends. The model does not take into account individuals younger than 20 years old, as these observations were not included due to the small sample size of individuals younger than 20. We then created a reduced model and performed a likelihood ratio test to determine if time of the day, day of the week, and sex were statistically significant predictors.
+
+# Results
+
+```{r, echo=FALSE}
+df2 <- df
+
+df2$fatal <- factor(df2$fatal, levels=c(1,0),
+         labels=c("Fatal", 
+                  "Non-Fatal"))
+
+df2$gender <- factor(df2$gender, levels=c('Male', 'Female'),
+         labels=c("Male", 
+                  "Female"))
+
+df2$naloxone <- factor(df2$naloxone, levels=c(1,0),
+         labels=c("True", 
+                  "False"))
+df2$pdNarcan <- factor(df2$pdNarcan, levels=c(1,0),
+         labels=c("True", 
+                  "False"))
+df2$mergedAgeGroup <- factor(df2$mergedAgeGroup, 
+         levels=c("Teen",
+                  "Young Adult",
+                  "Middle-aged Adult",
+                  "Elderly"),
+         labels=c("Teen",
+                  "Young Adult",
+                  "Middle-aged Adult",
+                  "Elderly"))
+
+df2$day <- factor(df2$day, 
+         levels=c("Monday",
+                  "Tuesday",
+                  "Wednesday",
+                  "Thursday",
+                  "Friday",
+                  "Saturday",
+                  "Sunday"),
+         labels=c("Monday",
+                  "Tuesday",
+                  "Wednesday",
+                  "Thursday",
+                  "Friday",
+                  "Saturday",
+                  "Sunday"))
+
+df2$timeOfDay <- factor(df2$timeOfDay, 
+         levels=c("Morning",
+                  "Afternoon",
+                  "Evening",
+                  "Overnight"),
+         labels=c("Morning",
+                  "Afternoon",
+                  "Evening",
+                  "Overnight"))
+
+
+label(df2$gender) <- "Sex"
+label(df2$mergedAgeGroup) <- "Age Group"
+label(df2$day) <- "Day of the Week"
+label(df2$timeOfDay) <- "Time of Day"
+label(df2$naloxone) <- "Administered Naloxone"
+
+tab1 <- table1(~ gender + mergedAgeGroup + day + timeOfDay + naloxone | fatal, data=df2, caption="Baseline Characteristics")
+tab1
+```
+
+In table 1, we observe the proportion fatalities in this sample increases by age. We see that 15.6\% of young adults suffer fatal overdose whereas 52.2\% of elderly individuals suffer from a fatal overdose. For the days of the week, the proportion of fatalities are mostly even throughout the week and the overall count is evenly spread out. Most notably, the a very large proportion of fatalities came from people who were not administered naloxone (84.7\%). Regarding gender, there was a larger proportion of males that suffered from fatal overdoes (62.2\%) but also an equally large proportion of males involved in overdoses (63.6\%). When comparing the actual proportions of deaths within males and females seperately, we see that the proportions of deaths are actually equal (figure 1). After using a chi-squared test ($\alpha = 0.05)$ to compare the proportions of male and female fatalities, we calculated a p-value of 0.066. Thus, we failed to reject the notion that gender has a statistically significant association with overdose fatality.
+
+```{r, echo=FALSE, fig.cap=". "}
+# Calculate Counts
+fatalCount <- table(df2$gender, df2$fatal)
+
+# Calculate Proportions
+fatalProp <- prop.table(fatalCount, margin = 1)
+FatalPropDf <- as.data.frame(fatalProp)
+
+# Create a bar plot
+ggplot(FatalPropDf, aes(x = Var1, y = Freq, fill = Var2)) +
+  geom_bar(stat = "identity") + 
+  scale_fill_manual(values = c("#F8766D","#00BFC4"), name = "Death") +
+  ggtitle("Proportion of Fatalities by Sex") +
+  labs(x = "Sex", y = "Proportion of Fatalities")
+```
+
+
+```{r, echo=FALSE, results='hide'}
+
+countsGenderFatal <- table(df2$gender, df2$fatal)
+chisq.test(countsGenderFatal)
+
+```
+
+```{r, echo=FALSE, message=FALSE}
+df <- df2
+df <- df %>% 
+  filter(mergedAgeGroup != "Teen")
+
+# Logistic Regression Model
+fit <- glm(fatal ~ gender + naloxone + weekend + mergedAgeGroup + timeOfDay, data = df, family = binomial)
+
+```
+
+```{r, echo=FALSE, message=FALSE}
+coefNames <- c('(Intercept)', 'Male','Naloxone','Weekend','Middle-Aged Adult','Young Adult', 'Evening', 'Morning', 'Overnight')
+coefEstimates <- unname(coef(fit))
+coefSE <- unname((summary(fit)$coef[, "Std. Error"]))
+# Get the confidence intervals for the coefficients
+confInt <- confint(fit)
+# Extract the lower and upper bounds of the confidence intervals
+lower <- confInt[,1]
+upper <- confInt[,2]
+CI <- sprintf("(%0.3f-%0.3f)", lower, upper)
+coefPVal <- unname(summary(fit)$coef[, 4])
+
+coefTable <- data.frame(coefNames, coefEstimates, coefSE, CI, coefPVal)
+
+tab2 <- kable_classic_2(kable(
+  coefTable,
+  col.names = c("Coefficient", "Estimate", "Standard Error", "95% CI", "P-Value"),
+  digits = 2,
+  caption = "Logistic Regression Estimates of Odds Ratios for Fatal Opioid Overdose",
+  format = "latex",
+  booktabs = TRUE
+  ), full_width = F, html_font = "Cambria")
+tab2
+```
+\noindent Several variables were shown not to be significant predictors in our first logistic regression model (Table 2). For patients who received naloxone, the log odds of dying from an overdose changes by -3.12 (95% confidence interval, -3.27–2.98), adjusting for the other variables. For young adults, the log odds of dying from an overdose changes by -2.04 (95% confidence interval, 2.22–1.86). These two variables were the most statistically significant factors, with large coefficient and low-pvalue. Weekends were determined to be statistically insignificant due to its large p-value from the wald test. In the likelihood ratio test to determine if age and time of day were significant predictors, we found a p-value of 0.052 and thus failed to reject the null hypothesis that their coefficients were nonzero. Thus, we could not confirm that age and time of day are significant predictors.
+
+```{r, echo=FALSE, message=FALSE}
+# Reduced Regression Model
+fit.red <- glm(fatal ~  naloxone + mergedAgeGroup + timeOfDay, data = df, family = binomial)
+
+coefNames <- c('(Intercept)','Naloxone','Middle-Aged Adult','Young Adult', 'Evening', 'Morning', 'Overnight')
+coefEstimates <- unname(coef(fit.red))
+coefSE <- unname((summary(fit.red)$coef[, "Std. Error"]))
+# Get the confidence intervals for the coefficients
+confInt <- confint(fit.red)
+# Extract the lower and upper bounds of the confidence intervals
+lower <- confInt[,1]
+upper <- confInt[,2]
+CI <- sprintf("(%0.3f-%0.3f)", lower, upper)
+coefPVal <- unname(summary(fit.red)$coef[, 4])
+
+coefTable <- data.frame(coefNames, coefEstimates, coefSE, CI, coefPVal)
+
+tab3 <- kable_classic_2(kable(
+  coefTable,
+  col.names = c("Coefficient", "Estimate", "Standard Error", "95% CI", "P-Value"),
+  digits = 2,
+  caption = "Reduced Logistic Regression Estimates of Odds Ratios for Fatal Opioid Overdose",
+  format = "latex",
+  booktabs = TRUE
+  ), full_width = F, html_font = "Cambria")
+tab3
+```
+```{r, echo=FALSE, results='hide'}
+anova(fit.red, fit, test = "Chisq")
+```
+
+
+
+The full logistic regression model is used to predict the probability of a fatal overdose and its prediction are plotted in figure 2 with colors indicating the true status of the patient for a given observation. At the far right of the curve, where the probability of death was estimated to be high, the vast majority of the observations there were fatal. Likewise, when probability of death was estimated to be low, many of the observations were non-fatal. 
+
+```{r, echo=FALSE, message=FALSE, fig.cap=". "}
+predictedData <- data.frame(
+  probOfFatal=fit$fitted.values,
+  fatal=df$fatal)
+ 
+predictedData <- predictedData[
+  order(predictedData$probOfFatal, decreasing=FALSE),]
+predictedData$rank <- 1:nrow(predictedData)
+
+fig2 <- ggplot(data=predictedData, aes(x=rank, y=probOfFatal)) +
+  geom_point(aes(color=factor(fatal))) +
+  xlab("Index") +
+  ylab("Probability") + labs(color = "True Outcome") + ggtitle("Predicted Probabilities of a Fatal Overdose") +
+  scale_color_manual(values = c("blue", "red"), 
+                     labels = c("Not Fatal", "Fatal"))
+fig2
+```
+
+# Discussion
+
+\noindent The efficacy of naloxone in treating an opioid overdose is well-known and many health experts recommend its use to overturn overdoses. A question that may arise is why there were many cases in which narcan was not used (43.1 \% of observations in the sample). Many attempts were made at treating using medical drugs such as epinephrine, the majority of which are shown to be ineffective at treating an opioid overdose. One possible why narcan was not administered could be due to a a misdiagnosis. If for instance a caller reports a cardiac arrest, common in older individuals, health responders may choose to use a different drug from naloxone, further increasing the time an individual is not breathing. A reassessment on how we respond to unconscious individuals may be beneficial.
+
+\noindent An intriguing statistic was that more than half of the recorded fatalities came from individuals older than 65 years of age. We later determined that a patient's age group was one of the most statistically significant predictors of a fatal overdose. This could perhaps be explained by the fact that elderly individuals often experience more health issues and may be more susceptible to an overdose. It should be noted that many opioids come in the form of prescription medication. Education about safe use of these medications is encouraged.
+
+\noindent Certain times of the day, namely the morning and the evening, were also statistically significant predictors, though not in the same magnitude as being younger or not receiving naloxone. It is not clear why this may be the case and more context would be necessary to understand the reasoning for this statistic.
+
+\noindent It is important to acknowledge that the study only observes incidents in the City of Mesa, Arizona and that the findings in this study are necessarily representative of the Phoenix Metropolitan Area. We therefore encourage that future studies collect data from other nearby cities such as Tempe, which also provide publicly available records on opioid incidents. 
+
+\noindent Additionally, we should also acknowledge that there are many factors about the incident that were not recorded. The amount of opioids in a person's system was not recorded as well as their prior history with the group of drugs. We are also not given the time it took for first responders to arrive at the scene nor were we given the approximate time any amount of naloxone was administered since the start of the overdose. Age was not able to be used as a numerical variable due to being reported categorically. All these factors, though difficult to reliably record, may be useful for determining a more precise predictive model.
+
+# Conclusion
+
+In this study, we estimated the coefficients of a logistic regression model to predict the odds of an overdose patient from dying. We determined that age and the administration of naloxone to be the most statistically significant predictors of a fatal overdose while sex, and day of the weak to be statistically insignificant. The time of day also appears to have an association with the odds of a fatality, with overdoses occurring in the evening and morning to increase the log odds of an individual dying. This study reaffirms the importance of using narcan in a timely manner for treating unconscious incidents, especially if there is reason to believe the person is suffering from an opioid overdose. It also highlights the possible danger of using opioids at an older age.
+
+# References
+
+[1] National Institute on Drug Abuse. ,Drug Overdose Death Rates. National
+Institute on Drug Abuse. Feb. 9, 2023. url: http : / / nida . nih . gov /
+research-topics/trends-statistics/overdose-death-rates (visited
+on 04/03/2023).
+
+[2] Casey Gnann. “A Multiple Case-Study Approach to Examine Police Offi-
+cers Perceptions on Narcan Policies”. ISBN: 9781392056851. PhD thesis.
+United States – Florida: Nova Southeastern University. 144 pp. url: https:
+//www.proquest.com/docview/2210456979/abstract/7F1517F46818412EPQ/
+1 (visited on 04/03/2023).
+
+[3] Lifesaving Naloxone. url: https://www.cdc.gov/stopoverdose/naloxone/
+index.html (visited on 04/03/2023).
+5
+[4] U. S. Government Accountability Office. Drug Misuse: Most States Have
+Good Samaritan Laws and Research Indicates They May Have Positive Ef-
+fects — U.S. GAO. Nov. 19, 2021. url: https://www.gao.gov/products/
+gao-21-248 (visited on 04/03/2023).
+
+[5] The Opioid Epidemic in the United States. SHADAC. Aug. 25, 2021. url:
+https://www.shadac.org/opioid-epidemic-united-states (visited on
+04/03/2023).

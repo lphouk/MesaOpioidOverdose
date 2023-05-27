@@ -1,0 +1,186 @@
+---
+title: "House Market Value in New York"
+author: "Leo Phouksouvath and Alesio Dosti"
+date: "March 20, 2023"
+output: pdf_document
+fig_caption: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = F, message = F, warning = F}
+library(tidyverse)
+library(knitr)
+library(gridExtra)
+library(dplyr)
+library(broom)
+```
+
+# Abstract
+The main aim of this study was to measure the effect of Net Operating Income and Building Age on Full Market Value for thousands of condominiums. 
+
+# Introduction
+The Housing market is one of the more complicated markets to statistically analyze. Real house prices are constantly fluctuating as a result to possible rising prosperity, moving interest rates, access to credit, changing supply and demand, etc. In this study, we attempt to analyze the relationship that Net Operating Income and Building Age can possibly have on Full Market Value of different New York City condominiums from the data set. 
+
+# Methods
+The Department of Finance is required by NY State Law to value condos as rental apartment buildings. This data set contains numerous subdivisions for thousands of different apartments in all of New York. For this study, a multiple linear regression was constructed considering the following characteristics: Net Operating Income, the age of the building, and Full Market Value. A summary statistic was constructed to build a model for our interaction. Following that, different plot graphs were used to determine linearity between the predictor and outcome variables in order to claim statistical significance.
+
+We provided baseline characteristics for our dataset, reporting the mean, standard deviation, median, and the interquartile range. We observed the distribution of each variable thorugh histograms and additionally plotted the covariates against the market value.
+
+We chose to model the dataset with multiple linear regression. In addition to the two variables mentioned, we had reason to believe the possibility of dependence between the age of the building and the operating income as well as the number of units and operating income, thus we included interaction terms in our model. Our resulting model is as follows:
+$$\hat{Y} = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \beta_3 X_1X_2$$
+where $Y$ is the expected Full Market Value, $X_1$ is the Net Operating Income, and $X_2$ is the Age of the Building.
+
+We then conducted an F-test, our hypotheses stating that $H_0: \beta_0 = \beta_1 = \beta_3 = 0$ and $H_A: \beta_0, \beta_1,$ or $\beta_3 \neq 0$, and used a significance level $\alpha=0.05$. We were interested in determining whether the age of the building was a statistically significant variable to predicting the market value. We also interested in determining whether the age had any affect on the operating income's relationship to the marketing value. Thus our reduced model is as follows:
+$$\hat{Y} = \beta_0 + \beta_1 X_1$$
+
+# Results
+
+```{r, echo = F, message = F, warning = F}
+# Original Data Set
+nycCondos <- read.csv('nyc-condos_s23.csv')
+
+# Included a column where I calculated the age of the building at the time of the report
+nycCondos$Building.Age <- nycCondos$Report.Year - nycCondos$Year.Built
+```
+
+```{r, echo = F}
+# Select only columns containing the outcome and predictor variables of interest
+nycCondosRelevantData <- nycCondos[c("Full.Market.Value", "Net.Operating.Income", "Building.Age")]
+
+# Number of observations
+NumObservations <- nrow(nycCondosRelevantData)
+
+# Calculate descriptive statistics for each variable
+FMV <- nycCondosRelevantData$Full.Market.Value
+FMVMEAN <- mean(FMV)
+FMVSD <- sd(FMV)
+FMVMEDIAN <- median(FMV)
+FMVIQR <- IQR(FMV)
+
+NOI <- nycCondosRelevantData$Net.Operating.Income
+NOIMEAN <- mean(NOI)
+NOISD <- sd(NOI)
+NOIMEDIAN <- median(NOI)
+NOIIQR <- IQR(NOI)
+
+BA <- nycCondosRelevantData$Building.Age
+BAMEAN <- mean(BA)
+BASD <- sd(BA)
+BAMEDIAN <- median(BA)
+BAIQR <- IQR(BA)
+
+means <- c(FMVMEAN, NOIMEAN, BAMEAN)
+sds <- c(FMVSD, NOISD, BASD)
+medians <- c(FMVMEDIAN, NOIMEDIAN, BAMEDIAN)
+iqrs <- c(FMVIQR, NOIIQR, BAIQR)
+```
+
+```{r, echo = FALSE, warning = FALSE, message=FALSE, fig.cap="Table 1"}
+# Summary Statistics
+table1 <- data.frame(
+  Sample.Size = c(length(FMV), length(NOI), length(BA)),
+  Variable = c("Full Market Value (dollars)", "Net Operating Income (dollars)", "Building Age (years)"),
+  Mean = c(FMVMEAN, NOIMEAN, BAMEAN),
+  SD = c(FMVSD, NOISD, BASD),
+  Median = c(FMVMEDIAN, NOIMEDIAN, BAMEDIAN),
+  IQR = c(FMVIQR, NOIIQR, BAIQR)
+)
+colnames(table1) <- c("Sample Size", "Variable", "Mean", "StdDev", "Median", "IQR")
+table1Sci <- format(table1, scientific = TRUE, digits = 3)
+kable(table1Sci, align = "c", caption = "Baseline Characteristics")
+```
+
+In table 1, we observe a large amount of variability in the full market value. For instance, we reported a median market value has a mean of \$1.42e+07 with a standard of \$2.10e+07. Given that the standard deviation is noticeably larger than the mean, there is an indication that the distribution of market values is not normal. We confirm this notion in figure 1. Here we observe a positive skew for the distribution for market values as well as for the opertating income for each condominium. This is indicative of a possible relationship between the market value and some other value. Interestingly, we observe what appears to be a bimodal distribution for the building ages in our sample.
+
+```{r, echo = FALSE, warning = FALSE, message=FALSE, fig.cap="Distribution of Variables"}
+# Distribution of Full Market Values
+dist1 <- ggplot(nycCondos, aes(x = Full.Market.Value)) +
+  geom_histogram(bins = 30, color = "black") +
+  labs(x = "Market Value ($)", y = "Count", title = "Distribution of Full Market Values") +
+  theme(plot.title = element_text(size = 12))
+
+# Distribution of Net Operating Incomes
+dist2 <- ggplot(nycCondos, aes(x = Net.Operating.Income)) +
+  geom_histogram(bins = 30, color = "black") +
+  labs(x = "Net Operating Income ($)", y = "Count", title = "Distribution of Operating Incomes") +
+  theme(plot.title = element_text(size = 12))
+
+# Distribution of Building Ages
+dist3 <- ggplot(nycCondos, aes(x = Building.Age)) +
+  geom_histogram(bins = 30, color = "black") +
+  labs(x = "Age (Years)", y = "Count", title = "Distribution of Building Ages") +
+  theme(plot.title = element_text(size = 12))
+
+grid.arrange(dist1, dist2, dist3, ncol=2, nrow=2, widths=c(0.4,0.4))
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Plot of Operating Income vs Market Value
+plot1 <- ggplot(nycCondos, aes(x = Net.Operating.Income, y = Full.Market.Value)) + geom_point() +
+  geom_smooth(method = "lm", se = FALSE) + labs(
+       x = "Net Operating Income (Dollars)",
+       y = "Full Market Value (Dollars)", caption = "Figure 2")
+
+# Plot of Bullding Age vs Market Value
+plot2 <- ggplot(nycCondos, aes(x = Building.Age, y = Full.Market.Value)) + geom_point() +
+  geom_smooth(method = "lm", se = FALSE) + labs(
+       x = "Building Age (Years)",
+       y = "Full Market Value (Dollars)")
+
+```
+
+Regarding the bivariates of the regression model, we can observe a strong correlation between the net operating income and full market value of the condominium. In contrast, the correlation between the building age and full market value is not as strong, though they do appear to have an apporximately linear relationshipm with outliers scattered evenly. That said, it is worth nothing that the plot for building age vs market value does appear to have two sepearte cluster of data points.
+```{r, echo = FALSE, warning = FALSE, message=FALSE, fig.cap="Plots of Covariates"}
+# Both plot 1 and 2 are included in the same figure
+grid.arrange(plot1, plot2, ncol=2, nrow=1, widths=c(0.4,0.4))
+```
+```{r, echo=FALSE, warning = FALSE, message=FALSE, results = 'hide'}
+# Full MLR Model
+fit.full <- lm(formula = Full.Market.Value ~ Net.Operating.Income + Building.Age + Net.Operating.Income * Building.Age, data = nycCondos)
+fit.full
+```
+```{r, echo=FALSE, warning = FALSE, message=FALSE, results = 'hide'}
+# Residual plots
+# plot(fit.full);
+# Examining these plots, it appears that the LINE assumptions are satisfied?
+```
+```{r, echo=FALSE, warning = FALSE, message=FALSE, results = 'hide'}
+# Summary statistics for linear model
+summary(fit.full)
+```
+```{r, echo=FALSE, warning = FALSE, message=FALSE, fig.cap="Table 1"}
+estimates <- summary(fit.full)$coefficients[, 1]
+se <- summary(fit.full)$coefficients[, 2]
+table2 <- data.frame(estimates, se)
+colnames(table2) <- c("Estimate", "StdError")
+rownames(table2) <- c("Intercept", "Net Operating Income", "Building Age", "Net Operating Income*Building Age")
+table2Sci <- format(table2, scientific = TRUE, digits = 3)
+kable(table2Sci, align = "c", caption = "Coefficients for MLR Model")
+```
+
+
+```{r, echo=FALSE, warning = FALSE, message=FALSE, results = 'hide'}
+# Reduced Model
+fit.red <- lm(formula = Full.Market.Value ~ Net.Operating.Income + Building.Age, data = nycCondos)
+
+# Analysis of Variance
+anova(fit.red, fit.full)
+```
+
+Regarding our linear model, we determined that the assumptions were met upon analyzing the residuals and that a multiple linear regression model is valid. From this model, we predicted that on average, for every dollar increase in net profit can expect an increase in market value ($\$7.941 \pm 3.255\times10^{-2}$) and for every year increase in the buildings age, we can expect a decrease in market value ($-\$2.319 \times 10^{2} \pm 1.921\times10^{3}$). 
+
+After performing an F-test, we found that the p-value = 0.05728 and from this result, we determined that the building age and the interactions term is not statistically significant in this model. In other words, there is not enough evidence to suggest that the relationship between the market value and net income differ based on the age of the condominium.
+
+# Discussion
+
+We proposed that the market price and net income of the building would be dependent on the age of the building, reasoning that if an older structure could perhaps have more costs associated with it as well as being perceived as less desirable. However, our analysis shows that this is not the case and that the interaction between the two variables is statistically insignificant. One thing we have not considered was the notion that newer buildings could perhaps be more expensive to maintain, having features that may perhaps use more energy or may need more maintenance. Older buildings may not necessarily have more significant structural issues if they are well-maintained and well-built. This could explain why the age of the building itself may not actually be particularly important when predicting the value of the condominium.
+
+This study chooses only one of several possible factors that affects the market price of a condominium. Other possible predictor variables include the number of units in the condo, which may increase net profit by having more renters, and the gross square foot of the condominium, as the land itself has an inherent value. We encourage further investigation of these particular variables to better understand how the market value of condominiums is determined.
+
+# Conclusion
+
+In this report, we observed a positive correlation between the Net Operating Income and the Full Market Value. We also suspected that there may have been other variables that affected the Market Value of the condominium, such as the building's age, but discovered upon further investigation that neither are statistically significant variables to the market value. This showcases the complexity of the way housing is priced on the market and highlights how some of the variables that would intuitively make sense to incorporate in pricing may not at all be of much importance. While it is clear that a building which nets a higher profit would be considered to be a more valuable asset, less is known about what makes a condominium profitable and we encourage further exploration of this question.
